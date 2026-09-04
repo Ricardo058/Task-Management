@@ -1,0 +1,6 @@
+node_modules/
+.edge-test/
+.edge-widget-test/
+.widget-profile/
+.widget-profile-v3/
+npm-debug.log*

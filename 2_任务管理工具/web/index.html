@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f3ea" />
+  <meta name="description" content="日序——把长期愿景、每周目标与每日行动连成一条温柔清晰的线。" />
+  <title>Rixu Desktop</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="../assets/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="splash" id="splash" aria-hidden="true"><div class="splash-orbit"><img src="../assets/logo.svg" alt="" /></div><strong>日序</strong><span>把想做的事，慢慢变成今天</span></div>
+
+  <section class="widget-app" id="widgetApp" aria-label="日序桌面小组件">
+    <header class="widget-head drag-zone">
+      <div class="widget-brand"><img src="../assets/logo.svg" alt="日序" /><div><strong>日序</strong><span id="widgetDate"></span></div></div>
+      <div class="widget-head-actions no-drag"><button class="soft-icon" id="widgetRefresh" title="刷新今日">↻</button><button class="soft-icon close-widget" id="widgetClose" title="退出">×</button></div>
+    </header>
+    <div class="widget-hero"><div><p id="widgetGreeting">今天也要轻轻向前</p><h1 id="widgetFocusTitle">先完成最重要的一件事</h1></div><div class="progress-bubble"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18"></circle><circle id="widgetProgressRing" cx="22" cy="22" r="18"></circle></svg><b id="widgetProgress">0%</b></div></div>
+    <main class="widget-scroll" id="widgetSections"></main>
+    <footer class="widget-footer no-drag"><a class="deep-button" id="deepManage" href="./index.html?manage=1" target="_blank"><span>✦</span> 深度管理 <i>→</i></a><span class="sync-hint"><i></i> 本机已保存</span></footer>
+  </section>
+
+  <div class="manager-app" id="managerApp">
+    <aside class="manager-sidebar">
+      <div class="manager-brand"><img src="../assets/logo.svg" alt="日序" /><div><strong>日序</strong><span>RIXU PLANNER</span></div></div>
+      <nav id="managerNav">
+        <button class="active" data-page="overview"><i>⌂</i><span>总览</span></button><button data-page="year"><i>◎</i><span>年度规划</span></button><button data-page="quarter"><i>◔</i><span>季度规划</span></button><button data-page="month"><i>☾</i><span>月度规划</span></button><button data-page="week"><i>◇</i><span>每周目标</span><b id="weekNavCount">0</b></button><button data-page="today"><i>✓</i><span>每日任务</span><b id="todayNavCount">0</b></button><button data-page="habits"><i>♧</i><span>习惯打卡</span></button><button data-page="widget"><i>◫</i><span>桌面配置</span></button>
+      </nav>
+      <div class="sidebar-note"><span>一句提醒</span><p>不必一下子看到整条路，走好脚下这一小步。</p></div>
+    </aside>
+    <main class="manager-main">
+      <header class="manager-topbar"><div class="manager-title-group"><button class="back-button hidden" id="backButton">← 返回总览</button><div><p id="managerDate"></p><h1 id="managerTitle">生活总览</h1></div></div><div class="manager-actions"><label class="search"><i></i><input id="globalSearch" placeholder="搜索目标与任务" /></label><button class="mode-button" id="pocketEntry"><i>◫</i><span>口袋版</span></button><button class="mode-button desktop-mode-button" id="desktopEntry"><i>⌂</i><span>固定桌面</span></button><button class="round-add" id="globalAdd" title="新建">＋</button><button class="exit-button" id="exitManager" title="退出日序">×</button></div></header>
+      <section class="manager-content" id="managerContent"></section>
+    </main>
+  </div>
+
+  <div class="modal-layer hidden" id="editorModal">
+    <form class="editor-card" id="editorForm"><header><div><span id="editorEyebrow">添加内容</span><h2 id="editorHeading">记下一件重要的事</h2></div><button type="button" class="modal-x" data-close-modal>×</button></header><label><span>标题</span><input id="editorTitle" maxlength="100" required placeholder="想完成什么？" /></label><label><span>补充说明</span><textarea id="editorNote" maxlength="300" rows="3" placeholder="写下原因、标准或下一步……"></textarea></label><div class="form-grid"><label><span>计划日期</span><input id="editorDate" type="date" /></label><label><span>状态</span><select id="editorStatus"><option value="todo">待开始</option><option value="doing">进行中</option><option value="done">已完成</option></select></label></div><input id="editorType" type="hidden" /><input id="editorId" type="hidden" /><footer><button type="button" class="delete-button hidden" id="deleteItem">删除</button><span></span><button type="button" class="ghost-button" data-close-modal>取消</button><button class="save-button" type="submit">保存</button></footer></form>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="./app.js"></script>
+</body>
+</html>
