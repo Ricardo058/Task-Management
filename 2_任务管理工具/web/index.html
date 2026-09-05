@@ -7,8 +7,10 @@
   <meta name="description" content="日序——把长期愿景、每周目标与每日行动连成一条温柔清晰的线。" />
   <title>Rixu Desktop</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="icon" href="../assets/icon-192.png" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="icon" type="image/x-icon" sizes="any" href="../assets/rixu-hd.ico?v=hd-taskbar-3" />
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icon-32.png?v=hd-taskbar-3" />
+  <link rel="icon" type="image/png" sizes="48x48" href="../assets/icon-48.png?v=hd-taskbar-3" />
+  <script>window.__RIXU_BUILD__=new URLSearchParams(location.search).get('build')||String(Date.now());const rixuStyle=document.createElement('link');rixuStyle.rel='stylesheet';rixuStyle.href='./styles.css?v='+encodeURIComponent(window.__RIXU_BUILD__);document.head.appendChild(rixuStyle);</script>
 </head>
 <body>
   <div class="splash" id="splash" aria-hidden="true"><div class="splash-orbit"><img src="../assets/logo.svg" alt="" /></div><strong>日序</strong><span>把想做的事，慢慢变成今天</span></div>
@@ -27,7 +29,7 @@
     <aside class="manager-sidebar">
       <div class="manager-brand"><img src="../assets/logo.svg" alt="日序" /><div><strong>日序</strong><span>RIXU PLANNER</span></div></div>
       <nav id="managerNav">
-        <button class="active" data-page="overview"><i>⌂</i><span>总览</span></button><button data-page="year"><i>◎</i><span>年度规划</span></button><button data-page="quarter"><i>◔</i><span>季度规划</span></button><button data-page="month"><i>☾</i><span>月度规划</span></button><button data-page="week"><i>◇</i><span>每周目标</span><b id="weekNavCount">0</b></button><button data-page="today"><i>✓</i><span>每日任务</span><b id="todayNavCount">0</b></button><button data-page="habits"><i>♧</i><span>习惯打卡</span></button><button data-page="widget"><i>◫</i><span>桌面配置</span></button>
+        <button class="active" data-page="overview"><i>⌂</i><span>总览</span></button><button data-page="year"><i>◎</i><span>年度规划</span></button><button data-page="quarter"><i>◔</i><span>季度规划</span></button><button data-page="month"><i>☾</i><span>月度规划</span></button><button data-page="week"><i>◇</i><span>每周目标</span><b id="weekNavCount">0</b></button><button data-page="today"><i>✓</i><span>每日任务</span><b id="todayNavCount">0</b></button><button data-page="habits"><i>♧</i><span>习惯打卡</span></button><button data-page="reports"><i>☷</i><span>执行简报</span></button><button data-page="widget"><i>◫</i><span>桌面配置</span></button>
       </nav>
       <div class="sidebar-note"><span>一句提醒</span><p>不必一下子看到整条路，走好脚下这一小步。</p></div>
     </aside>
@@ -41,6 +43,6 @@
     <form class="editor-card" id="editorForm"><header><div><span id="editorEyebrow">添加内容</span><h2 id="editorHeading">记下一件重要的事</h2></div><button type="button" class="modal-x" data-close-modal>×</button></header><label><span>标题</span><input id="editorTitle" maxlength="100" required placeholder="想完成什么？" /></label><label><span>补充说明</span><textarea id="editorNote" maxlength="300" rows="3" placeholder="写下原因、标准或下一步……"></textarea></label><div class="form-grid"><label><span>计划日期</span><input id="editorDate" type="date" /></label><label><span>状态</span><select id="editorStatus"><option value="todo">待开始</option><option value="doing">进行中</option><option value="done">已完成</option></select></label></div><input id="editorType" type="hidden" /><input id="editorId" type="hidden" /><footer><button type="button" class="delete-button hidden" id="deleteItem">删除</button><span></span><button type="button" class="ghost-button" data-close-modal>取消</button><button class="save-button" type="submit">保存</button></footer></form>
   </div>
   <div class="toast" id="toast" role="status"></div>
-  <script src="./app.js"></script>
+  <script>const rixuScript=document.createElement('script');rixuScript.src='./app.js?v='+encodeURIComponent(window.__RIXU_BUILD__);document.body.appendChild(rixuScript);</script>
 </body>
 </html>
