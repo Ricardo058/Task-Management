@@ -51,9 +51,10 @@ static class RixuLauncher {
       }
       if(window==Zero)throw new Exception("The requested Rixu window did not start in time.");
 
-      if(manage||pocket){ShowWindow(window,5);SetForegroundWindow(window);HoldSharpWindowIcon(window,root,manage?"Manager":"Pocket");return;}
-      SetParent(window,Zero);var area=Screen.PrimaryScreen.WorkingArea;
-      SetWindowPos(window,Bottom,area.X+area.Width-442,area.Y+area.Height-622,420,600,0x0040);HoldSharpWindowIcon(window,root,"Desktop");
+      if(manage){ShowWindow(window,5);SetForegroundWindow(window);HoldSharpWindowIcon(window,root,"Manager");return;}
+      var area=Screen.PrimaryScreen.WorkingArea;ShowWindow(window,9);
+      if(pocket){int x=area.X+(area.Width-420)/2,y=area.Y+(area.Height-600)/2;SetWindowPos(window,Zero,x,y,420,600,0x0040);SetForegroundWindow(window);HoldSharpWindowIcon(window,root,"Pocket");return;}
+      SetParent(window,Zero);SetWindowPos(window,Bottom,area.X+area.Width-442,area.Y+area.Height-622,420,600,0x0040);HoldSharpWindowIcon(window,root,"Desktop");
     }catch(Exception ex){try{File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"launcher-error.log"),ex.ToString(),Encoding.UTF8);}catch{}MessageBox.Show(ex.Message,"Rixu",MessageBoxButtons.OK,MessageBoxIcon.Information);}
   }
 
