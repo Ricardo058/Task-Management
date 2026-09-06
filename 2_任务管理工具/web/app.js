@@ -38,10 +38,11 @@ function visible(list){if(!search)return list;const q=search.toLowerCase();retur
 function periodLabel(type){return {year:'2026 YEAR',quarter:'Q3 QUARTER',month:'SEPTEMBER',week:'THIS WEEK',today:'TODAY'}[type]}
 
 function renderWidget(){
-  const todayItems=data.items.today.filter(x=>x.date===today||!x.date),p=progressOf(todayItems);$('#widgetProgress').textContent=`${p}%`;$('#widgetProgressRing').style.strokeDashoffset=113-(113*p/100);
+  const focus=[...data.items.today,...data.items.week].sort((a,b)=>Number(b.pinned)-Number(a.pinned)).find(x=>x.status==='doing')||data.items.today.find(x=>x.status==='todo');
+  const p=focus?0:100;$('#widgetProgress').textContent=`${p}%`;$('#widgetProgressRing').style.strokeDashoffset=113-(113*p/100);
   $('#widgetDate').textContent=new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',weekday:'short'}).format(new Date());
   const hour=new Date().getHours();$('#widgetGreeting').textContent=hour<11?'早上好，慢慢进入状态':hour<18?'下午好，保持自己的节奏':'晚上好，记得为今天收尾';
-  const focus=[...data.items.today,...data.items.week].sort((a,b)=>Number(b.pinned)-Number(a.pinned)).find(x=>x.status==='doing')||data.items.today.find(x=>x.status==='todo');$('#widgetFocusTitle').textContent=focus?.title||'今天已经圆满收尾啦';
+  $('#widgetFocusTitle').textContent=focus?.title||'今天已经圆满收尾啦';
   const pinned=allItems().filter(x=>x.pinned);$('#widgetSections').innerHTML=(pinned.length?pinnedWidgetSection(pinned):'')+data.config.filter(x=>x.visible).map((cfg,index)=>widgetSection(cfg,index+(pinned.length?1:0))).join('');
   updateWindowPinButton();
   bindActions($('#widgetSections'));
