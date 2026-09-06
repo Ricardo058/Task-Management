@@ -25,19 +25,23 @@ static class RixuLauncher {
   [DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr icon);
   static readonly IntPtr Zero=IntPtr.Zero;
   static readonly IntPtr Bottom=new IntPtr(1);
+  static readonly IntPtr TopMost=new IntPtr(-1);
+  static readonly IntPtr NoTopMost=new IntPtr(-2);
 
   [STAThread] static void Main(string[] args){
     try{
       string root=AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
       string request=String.Join(" ",args).ToLowerInvariant();
       if(request.Contains("rixu://report")){SaveReport(args,root);return;}
+      if(request.Contains("rixu://topmost")){SetTopmost(request);return;}
+      if(request.Contains("rixu://wechat")){OpenWechat();return;}
       if(request.Contains("exit-manager")){CloseWindow("Rixu Manager");return;}
       if(request.Contains("close-pocket")){CloseWindow("Rixu Pocket");CloseWindow("Rixu Desktop Widget");return;}
       RegisterProtocol(root);
 
       bool pocket=request.Contains("pocket"),desktop=request.Contains("desktop"),manage=!pocket&&!desktop;
       string edge=FindEdge();if(edge==null)throw new Exception("Microsoft Edge was not found.");
-      string modeQuery=manage?"?manage=1":pocket?"?widget=1&pocket=1":"?widget=1&desktop=1";
+      string modeQuery=manage?"?manage=1":pocket?"?widget=1&pocket=1":"?widget=1&desktop=1&topmost=1";
       string title=manage?"Rixu Manager":pocket?"Rixu Pocket":"Rixu Desktop Widget";
       string build=GetBuildVersion(root),windowTitle=title+" · "+build;
       string page=new Uri(Path.Combine(root,"web","index.html")).AbsoluteUri+modeQuery+"&build="+build;
@@ -54,13 +58,30 @@ static class RixuLauncher {
       if(manage){ShowWindow(window,5);SetForegroundWindow(window);HoldSharpWindowIcon(window,root,"Manager");return;}
       var area=Screen.PrimaryScreen.WorkingArea;ShowWindow(window,9);
       if(pocket){int x=area.X+(area.Width-420)/2,y=area.Y+(area.Height-600)/2;SetWindowPos(window,Zero,x,y,420,600,0x0040);SetForegroundWindow(window);HoldSharpWindowIcon(window,root,"Pocket");return;}
-      SetParent(window,Zero);SetWindowPos(window,Bottom,area.X+area.Width-442,area.Y+area.Height-622,420,600,0x0040);HoldSharpWindowIcon(window,root,"Desktop");
+      SetParent(window,Zero);SetWindowPos(window,TopMost,area.X+area.Width-442,area.Y+area.Height-622,420,600,0x0040);SetForegroundWindow(window);HoldSharpWindowIcon(window,root,"Desktop");
     }catch(Exception ex){try{File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"launcher-error.log"),ex.ToString(),Encoding.UTF8);}catch{}MessageBox.Show(ex.Message,"Rixu",MessageBoxButtons.OK,MessageBoxIcon.Information);}
   }
 
   static void RegisterProtocol(string root){
     string exe=Process.GetCurrentProcess().MainModule.FileName;
     using(var key=Registry.CurrentUser.CreateSubKey(@"Software\Classes\rixu")){key.SetValue("","URL:Rixu Protocol");key.SetValue("URL Protocol","");using(var icon=key.CreateSubKey("DefaultIcon"))icon.SetValue("",exe+",0");using(var command=key.CreateSubKey(@"shell\open\command"))command.SetValue("","\""+exe+"\" \"%1\"");}
+  }
+  static void SetTopmost(string request){
+    bool enabled=request.Contains("enabled=1"),desktop=request.Contains("mode=desktop");
+    string title=desktop?"Rixu Desktop Widget":"Rixu Pocket";IntPtr window=FindTitledWindow(title);
+    if(window==Zero)window=FindTitledWindow(desktop?"Rixu Pocket":"Rixu Desktop Widget");
+    if(window==Zero)return;
+    SetWindowPos(window,enabled?TopMost:NoTopMost,0,0,0,0,0x0013);
+    if(enabled)SetForegroundWindow(window);
+  }
+  static void OpenWechat(){
+    string runningPath=null;
+    foreach(string name in new[]{"Weixin","WeChat"})foreach(Process process in Process.GetProcessesByName(name)){if(process.MainWindowHandle!=Zero){ShowWindow(process.MainWindowHandle,9);SetForegroundWindow(process.MainWindowHandle);return;}try{if(String.IsNullOrEmpty(runningPath))runningPath=process.MainModule.FileName;}catch{}}
+    if(!String.IsNullOrEmpty(runningPath)&&File.Exists(runningPath)){Process.Start(new ProcessStartInfo(runningPath){UseShellExecute=true});return;}
+    try{Process.Start(new ProcessStartInfo("weixin://"){UseShellExecute=true});return;}catch{}
+    string local=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),programs=Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),programsX86=Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+    foreach(string path in new[]{Path.Combine(programsX86,"Tencent","WeChat","WeChat.exe"),Path.Combine(programs,"Tencent","Weixin","Weixin.exe"),Path.Combine(local,"Tencent","WeChat","WeChat.exe")})if(File.Exists(path)){Process.Start(new ProcessStartInfo(path){UseShellExecute=true});return;}
+    throw new Exception("未找到微信。图片已保存在下载文件夹，可在微信中手动选择发送。");
   }
   static void SaveReport(string[] args,string root){
     string raw=Array.Find(args,x=>x.StartsWith("rixu://report",StringComparison.OrdinalIgnoreCase));
