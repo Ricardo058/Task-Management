@@ -3,18 +3,25 @@ const OLD_KEY='focus-desk-tasks-v1';
 const $=(s)=>document.querySelector(s);const $$=(s)=>[...document.querySelectorAll(s)];
 const uid=()=>`${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const dateKey=(d=new Date())=>{const x=new Date(d.getTime()-d.getTimezoneOffset()*60000);return x.toISOString().slice(0,10)};
-const today=dateKey();
+let today=dateKey();
 const labels={year:'年度规划',quarter:'季度规划',month:'月度规划',week:'每周目标',today:'每日任务',habits:'习惯打卡'};
 const icons={year:'◎',quarter:'◔',month:'☾',week:'◇',today:'✓',habits:'♧'};
 const pinIcon=()=>'<svg class="pin-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="pin-head" d="M9 3.5h6l-.8 4.3 2.5 3.4v1.6H7.3v-1.6l2.5-3.4L9 3.5Z"></path><path d="M12 12.8V21"></path></svg>';
 const pageTitles={overview:'生活总览',year:'年度规划',quarter:'季度规划',month:'月度规划',week:'每周目标',today:'每日任务',habits:'习惯打卡',reports:'执行简报',widget:'桌面配置'};
 const defaultStartAt=(date=today)=>`${date}T09:00`;
 const defaultEndAt=(date=today)=>`${date}T23:59`;
-function normalizeTask(x,type){const date=(x.startAt||x.date||today).slice(0,10);return{...x,type:x.type||type,date,startAt:x.startAt||defaultStartAt(date),endAt:x.endAt||defaultEndAt(x.date||date),pinned:x.pinned===true}}
+function normalizeTask(x,type){const date=(x.startAt||x.date||today).slice(0,10);return{...x,type:x.type||type,date,startAt:x.startAt||defaultStartAt(date),endAt:x.endAt||defaultEndAt(x.date||date),status:x.status||'todo',statusHistory:x.statusHistory&&typeof x.statusHistory==='object'?x.statusHistory:{},pinned:x.pinned===true}}
 function strategyItem(){const x=item('长期战略','记录未来 3—5 年真正重要的方向，并定期校准。','year','todo',today);x.id='rixu-long-term-strategy';x.systemCard='long-strategy';x.pinned=true;x.endAt=defaultEndAt(`${new Date().getFullYear()}-12-31`);return x}
+function resetDailyState(store,targetDate=today){
+  if(store.lastStatusDate===targetDate)return false;
+  const previousDate=store.lastStatusDate;
+  for(const type of ['year','quarter','month','week','today'])for(const task of store.items?.[type]||[]){task.statusHistory=task.statusHistory&&typeof task.statusHistory==='object'?task.statusHistory:{};if(previousDate)task.statusHistory[previousDate]=task.status||'todo';task.status='todo'}
+  store.lastStatusDate=targetDate;return true;
+}
+function setTaskStatus(task,status){task.status=status;task.statusHistory=task.statusHistory&&typeof task.statusHistory==='object'?task.statusHistory:{};task.statusHistory[today]=status}
 
 function load(){
-  try{const saved=JSON.parse(localStorage.getItem(DB_KEY));if(saved){saved.items=saved.items||{};for(const type of ['year','quarter','month','week','today'])saved.items[type]=(saved.items[type]||[]).map(x=>normalizeTask(x,type));if(!saved.items.year.some(x=>x.systemCard==='long-strategy'||x.id==='rixu-long-term-strategy'))saved.items.year.unshift(strategyItem());saved.habits=(saved.habits||[]).map(h=>({...h,enabled:h.enabled!==false,startDate:h.startDate||today,history:Array.isArray(h.history)?h.history:[]}));saved.config=saved.config||[];saved.windowPinned=saved.windowPinned===true;localStorage.setItem(DB_KEY,JSON.stringify(saved));return saved}}catch{}
+  try{const saved=JSON.parse(localStorage.getItem(DB_KEY));if(saved){saved.items=saved.items||{};for(const type of ['year','quarter','month','week','today'])saved.items[type]=(saved.items[type]||[]).map(x=>normalizeTask(x,type));if(!saved.items.year.some(x=>x.systemCard==='long-strategy'||x.id==='rixu-long-term-strategy'))saved.items.year.unshift(strategyItem());saved.habits=(saved.habits||[]).map(h=>({...h,enabled:h.enabled!==false,startDate:h.startDate||today,history:Array.isArray(h.history)?h.history:[]}));saved.config=saved.config||[];saved.windowPinned=saved.windowPinned===true;resetDailyState(saved);localStorage.setItem(DB_KEY,JSON.stringify(saved));return saved}}catch{}
   let old=[];try{old=JSON.parse(localStorage.getItem(OLD_KEY))||[]}catch{}
   const initial={items:{
     year:[strategyItem(),item('建立更从容、有成长感的生活系统','让工作、身体和关系都获得稳定投入。','year','doing','2026-12-31')],
@@ -22,9 +29,9 @@ function load(){
     month:[item('稳定每周复盘节奏','连续完成四次周复盘。','month','doing',monthEnd())],
     week:[item('完成任务工具桌面版','让它值得每天打开。','week','doing',weekEnd()),item('安排两次有氧运动','每次至少 30 分钟。','week','todo',weekEnd()),item('整理本周关键资料','','week','todo',weekEnd())],
     today:old.length?old.map(x=>normalizeTask({...x,pinned:false},'today')):[item('完成今天最重要的工作','','today','doing',today),item('阅读 20 分钟','','today','todo',today),item('整理桌面与收件箱','','today','done',today)]
-  },habits:[{id:uid(),title:'运动 30 分钟',emoji:'🏃',enabled:true,startDate:today,history:[]},{id:uid(),title:'喝足 8 杯水',emoji:'💧',enabled:true,startDate:today,history:[today]},{id:uid(),title:'睡前阅读',emoji:'📖',enabled:true,startDate:today,history:[]}],config:[{id:'week',visible:true,collapsed:false},{id:'today',visible:true,collapsed:false},{id:'habits',visible:true,collapsed:false},{id:'month',visible:false,collapsed:false},{id:'quarter',visible:false,collapsed:true},{id:'year',visible:false,collapsed:true}],windowPinned:false};localStorage.setItem(DB_KEY,JSON.stringify(initial));return initial;
+  },habits:[{id:uid(),title:'运动 30 分钟',emoji:'🏃',enabled:true,startDate:today,history:[]},{id:uid(),title:'喝足 8 杯水',emoji:'💧',enabled:true,startDate:today,history:[today]},{id:uid(),title:'睡前阅读',emoji:'📖',enabled:true,startDate:today,history:[]}],config:[{id:'week',visible:true,collapsed:false},{id:'today',visible:true,collapsed:false},{id:'habits',visible:true,collapsed:false},{id:'month',visible:false,collapsed:false},{id:'quarter',visible:false,collapsed:true},{id:'year',visible:false,collapsed:true}],windowPinned:false,lastStatusDate:today};localStorage.setItem(DB_KEY,JSON.stringify(initial));return initial;
 }
-function item(title,note,type,status,date){return{id:uid(),title,note,type,status,date,startAt:defaultStartAt(date),endAt:defaultEndAt(date),pinned:false,createdAt:Date.now()}}
+function item(title,note,type,status,date){return{id:uid(),title,note,type,status,statusHistory:{[today]:status},date,startAt:defaultStartAt(date),endAt:defaultEndAt(date),pinned:false,createdAt:Date.now()}}
 function monthEnd(){const d=new Date();return dateKey(new Date(d.getFullYear(),d.getMonth()+1,0))}
 function weekEnd(){const d=new Date();d.setDate(d.getDate()+((7-d.getDay())%7));return dateKey(d)}
 let data=load(),page='overview',search='',deferredInstall=null,editorSaveTimer=null,editorDirty=false;
@@ -140,7 +147,7 @@ function bindDragSort(root,kind,type=''){
 }
 
 function bindActions(root){
-  root.querySelectorAll('[data-toggle-item]').forEach(b=>b.onclick=()=>{const row=b.closest('[data-id]'),x=data.items[row.dataset.type].find(i=>i.id===row.dataset.id);x.status=x.status==='done'?'todo':'done';save();burst(b)});
+  root.querySelectorAll('[data-toggle-item]').forEach(b=>b.onclick=()=>{const row=b.closest('[data-id]'),x=data.items[row.dataset.type].find(i=>i.id===row.dataset.id);setTaskStatus(x,x.status==='done'?'todo':'done');save();burst(b)});
   root.querySelectorAll('[data-habit]').forEach(b=>b.onclick=()=>{const h=data.habits.find(x=>x.id===b.dataset.habit),i=h.history.indexOf(today);i>=0?h.history.splice(i,1):h.history.push(today);save();burst(b)});
   root.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>openEditor(b.dataset.add));root.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{const row=b.closest('[data-id]');openEditor(row.dataset.type,row.dataset.id)});
   root.querySelectorAll('[data-edit-habit]').forEach(b=>b.onclick=()=>openEditor('habits',b.dataset.editHabit));
@@ -160,8 +167,8 @@ function persistEditor(){
     const values={title,startDate:$('#editorDate').value||today,enabled:$('#editorStatus').value!=='hidden'};
     if(id){const habit=data.habits.find(x=>x.id===id);if(habit)Object.assign(habit,values)}else{id=uid();data.habits.unshift({id,...values,emoji:'🌱',history:[]})}
   }else{
-    const startAt=$('#editorDate').value||defaultStartAt(),endAt=$('#editorEndDate').value||defaultEndAt(startAt.slice(0,10)),values={title,note:$('#editorNote').value.trim(),date:startAt.slice(0,10),startAt,endAt,status:$('#editorStatus').value,type,pinned:$('#editorPinned').checked,updatedAt:Date.now()};
-    if(id){const current=data.items[type]?.find(x=>x.id===id);if(current){const wasPinned=current.pinned;Object.assign(current,values);if(!wasPinned&&current.pinned)moveToFront(data.items[type],id)}}else{id=uid();data.items[type].unshift({...values,id,createdAt:Date.now()})}
+    const startAt=$('#editorDate').value||defaultStartAt(),endAt=$('#editorEndDate').value||defaultEndAt(startAt.slice(0,10)),status=$('#editorStatus').value,values={title,note:$('#editorNote').value.trim(),date:startAt.slice(0,10),startAt,endAt,type,pinned:$('#editorPinned').checked,updatedAt:Date.now()};
+    if(id){const current=data.items[type]?.find(x=>x.id===id);if(current){const wasPinned=current.pinned;Object.assign(current,values);setTaskStatus(current,status);if(!wasPinned&&current.pinned)moveToFront(data.items[type],id)}}else{id=uid();const created={...values,id,createdAt:Date.now()};setTaskStatus(created,status);data.items[type].unshift(created)}
   }
   $('#editorId').value=id;$('#deleteItem').classList.remove('hidden');$('#editorHeading').textContent='调整这项内容';localStorage.setItem(DB_KEY,JSON.stringify(data));editorDirty=false;setAutoSaveState('已自动保存','saved');return true;
 }
@@ -169,6 +176,7 @@ function scheduleEditorSave(){editorDirty=true;clearTimeout(editorSaveTimer);set
 function openEditor(type,id=''){clearTimeout(editorSaveTimer);editorDirty=false;const isHabit=type==='habits',x=isHabit?data.habits.find(h=>h.id===id):data.items[type]?.find(i=>i.id===id),systemCard=x?.systemCard==='long-strategy';$('#editorForm').reset();$('#editorType').value=type;$('#editorId').value=id;$('#editorTitle').value=x?.title||'';$('#editorNote').value=x?.note||'';$('#editorDate').type=isHabit?'date':'datetime-local';$('#editorDate').value=isHabit?(x?.startDate||today):(x?.startAt||defaultStartAt());$('#editorEndDate').value=x?.endAt||defaultEndAt();$('#editorStatus').innerHTML=isHabit?'<option value="active">加入打卡</option><option value="hidden">隐藏</option>':'<option value="todo">待开始</option><option value="doing">进行中</option><option value="done">已完成</option>';$('#editorStatus').value=isHabit?(x?.enabled===false?'hidden':'active'):(x?.status||'todo');$('#editorPinned').checked=!isHabit&&x?.pinned===true;$('#editorPinField').classList.toggle('hidden',isHabit);$('#editorNoteField').classList.toggle('hidden',isHabit);$('#editorEndField').classList.toggle('hidden',isHabit);$('#editorDateLabel').textContent=isHabit?'开始日期':'执行时间';$('#editorHeading').textContent=id?'调整这项内容':`添加${labels[type]||'内容'}`;$('#editorEyebrow').textContent=isHabit?'日常节奏':periodLabel(type)||'NEW ITEM';$('#deleteItem').classList.toggle('hidden',!id||systemCard);setAutoSaveState(systemCard?'固定卡片会自动保存':id?'修改后自动保存':'填写标题后自动保存');$('#editorModal').classList.remove('hidden');setTimeout(()=>$('#editorTitle').focus(),40)}
 function closeEditor(flush=true,rerender=true){clearTimeout(editorSaveTimer);if(flush&&editorDirty)persistEditor();editorDirty=false;$('#editorModal').classList.add('hidden');if(rerender)renderAll()}
 function renderAll(){renderWidget();renderManager()}
+function ensureCurrentDay(){const current=dateKey();if(current===today)return;today=current;resetDailyState(data,current);localStorage.setItem(DB_KEY,JSON.stringify(data));renderAll();toast('新的一天，任务和打卡状态已重置')}
 function burst(el){el.animate([{transform:'scale(.75)'},{transform:'scale(1.18)'},{transform:'scale(1)'}],{duration:330,easing:'ease-out'})}
 let toastTimer;function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),2200)}
 
@@ -187,6 +195,7 @@ function setup(){
   $$('[data-close-share]').forEach(b=>b.onclick=closeReportShare);$('#reportShareModal').onclick=e=>{if(e.target===$('#reportShareModal'))closeReportShare()};$('#shareToWechat').onclick=shareToWechat;$('#saveReportImage').onclick=downloadReportImage;$('#systemShareImage').onclick=systemShareReport;
   $('#deepManage').onclick=e=>{e.preventDefault();location.href='rixu://manager'};
   window.addEventListener('storage',e=>{if(e.key===DB_KEY){data=load();if($('#editorModal').classList.contains('hidden'))renderAll();else renderWidget()}});
+  window.addEventListener('focus',ensureCurrentDay);document.addEventListener('visibilitychange',()=>{if(!document.hidden)ensureCurrentDay()});setInterval(ensureCurrentDay,30000);
   window.addEventListener('beforeunload',()=>{if(editorDirty)persistEditor()});
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e});
   if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
