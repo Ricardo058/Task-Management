@@ -32,9 +32,8 @@ class IconGenerator {
   }
   static void Main(string[] args) {
     string root=args.Length>0?args[0]:Directory.GetCurrentDirectory(),assets=Path.Combine(root,"assets");Directory.CreateDirectory(assets);
-    foreach(int size in new[]{16,20,24,32,40,48,64,80,96,128,192,256,512})File.WriteAllBytes(Path.Combine(assets,"icon-"+size+".png"),Draw(size));
+    foreach(int size in new[]{32,48,192,512})File.WriteAllBytes(Path.Combine(assets,"icon-"+size+".png"),Draw(size));
     int[] sizes={16,20,24,32,40,48,64,80,96,128,256};var images=new List<byte[]>();foreach(int s in sizes)images.Add(Draw(s));
-    string ico=Path.Combine(assets,"rixu.ico");using(var fs=File.Create(ico)) using(var w=new BinaryWriter(fs)){w.Write((ushort)0);w.Write((ushort)1);w.Write((ushort)sizes.Length);int offset=6+16*sizes.Length;for(int i=0;i<sizes.Length;i++){w.Write((byte)(sizes[i]==256?0:sizes[i]));w.Write((byte)(sizes[i]==256?0:sizes[i]));w.Write((byte)0);w.Write((byte)0);w.Write((ushort)1);w.Write((ushort)32);w.Write(images[i].Length);w.Write(offset);offset+=images[i].Length;}foreach(var bytes in images)w.Write(bytes);}
-    File.Copy(ico,Path.Combine(assets,"rixu-hd.ico"),true);
+    string ico=Path.Combine(assets,"rixu-hd.ico");using(var fs=File.Create(ico)) using(var w=new BinaryWriter(fs)){w.Write((ushort)0);w.Write((ushort)1);w.Write((ushort)sizes.Length);int offset=6+16*sizes.Length;for(int i=0;i<sizes.Length;i++){w.Write((byte)(sizes[i]==256?0:sizes[i]));w.Write((byte)(sizes[i]==256?0:sizes[i]));w.Write((byte)0);w.Write((byte)0);w.Write((ushort)1);w.Write((ushort)32);w.Write(images[i].Length);w.Write(offset);offset+=images[i].Length;}foreach(var bytes in images)w.Write(bytes);}
   }
 }

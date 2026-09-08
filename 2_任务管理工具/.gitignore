@@ -3,4 +3,5 @@ node_modules/
 .edge-widget-test/
 .widget-profile/
 .widget-profile-v3/
+launcher-error.log
 npm-debug.log*

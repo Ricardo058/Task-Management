@@ -37,7 +37,7 @@ static class RixuLauncher {
       if(request.Contains("rixu://wechat")){OpenWechat();return;}
       if(request.Contains("exit-manager")){CloseWindow("Rixu Manager");return;}
       if(request.Contains("close-pocket")){CloseWindow("Rixu Pocket");CloseWindow("Rixu Desktop Widget");return;}
-      RegisterProtocol(root);
+      try{RegisterProtocol(root);}catch{}
 
       bool pocket=request.Contains("pocket"),desktop=request.Contains("desktop"),manage=!pocket&&!desktop;
       string edge=FindEdge();if(edge==null)throw new Exception("Microsoft Edge was not found.");
@@ -45,11 +45,11 @@ static class RixuLauncher {
       string title=manage?"Rixu Manager":pocket?"Rixu Pocket":"Rixu Desktop Widget";
       string build=GetBuildVersion(root),windowTitle=title+" · "+build;
       string page=new Uri(Path.Combine(root,"web","index.html")).AbsoluteUri+modeQuery+"&build="+build;
-      string profile=Path.Combine(root,".widget-profile-v3");
+      string profile=PrepareProfile(root);
       IntPtr window=FindTitledWindow(windowTitle);
       if(window==Zero){
         if(FindTitledWindow(title)!=Zero){CloseWindow(title);Thread.Sleep(180);}
-        string edgeArgs="--app=\""+page+"\" --user-data-dir=\""+profile+"\" --no-first-run --disable-extensions --disable-background-mode "+(manage?"--window-size=1280,820":"--window-size=420,600");
+        string edgeArgs="--app=\""+page+"\" --user-data-dir=\""+profile+"\" --no-first-run --no-default-browser-check --disable-extensions --disable-background-mode --disable-sync "+(manage?"--window-size=1280,820":"--window-size=420,600");
         Process.Start(new ProcessStartInfo(edge,edgeArgs){UseShellExecute=true});
         for(int i=0;i<70&&window==Zero;i++){Thread.Sleep(100);window=FindTitledWindow(windowTitle);}
       }
@@ -59,12 +59,26 @@ static class RixuLauncher {
       var area=Screen.PrimaryScreen.WorkingArea;ShowWindow(window,9);
       if(pocket){int x=area.X+(area.Width-420)/2,y=area.Y+(area.Height-600)/2;SetWindowPos(window,Zero,x,y,420,600,0x0040);SetForegroundWindow(window);HoldSharpWindowIcon(window,root,"Pocket");return;}
       SetParent(window,Zero);SetWindowPos(window,TopMost,area.X+area.Width-442,area.Y+area.Height-622,420,600,0x0040);SetForegroundWindow(window);HoldSharpWindowIcon(window,root,"Desktop");
-    }catch(Exception ex){try{File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"launcher-error.log"),ex.ToString(),Encoding.UTF8);}catch{}MessageBox.Show(ex.Message,"Rixu",MessageBoxButtons.OK,MessageBoxIcon.Information);}
+    }catch(Exception ex){try{File.WriteAllText(Path.Combine(RuntimeRoot(),"launcher-error.log"),ex.ToString(),Encoding.UTF8);}catch{}MessageBox.Show(ex.Message,"Rixu",MessageBoxButtons.OK,MessageBoxIcon.Information);}
   }
 
   static void RegisterProtocol(string root){
     string exe=Process.GetCurrentProcess().MainModule.FileName;
     using(var key=Registry.CurrentUser.CreateSubKey(@"Software\Classes\rixu")){key.SetValue("","URL:Rixu Protocol");key.SetValue("URL Protocol","");using(var icon=key.CreateSubKey("DefaultIcon"))icon.SetValue("",exe+",0");using(var command=key.CreateSubKey(@"shell\open\command"))command.SetValue("","\""+exe+"\" \"%1\"");}
+  }
+  static string RuntimeRoot(){string path=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"RixuPlanner");Directory.CreateDirectory(path);return path;}
+  static string PrepareProfile(string root){
+    string profile=Path.Combine(RuntimeRoot(),"EdgeProfile"),target=Path.Combine(profile,"Default","Local Storage","leveldb");
+    if(!Directory.Exists(target)){
+      string source=Path.Combine(root,".widget-profile-v3","Default","Local Storage","leveldb");
+      if(Directory.Exists(source))CopyDirectory(source,target);else Directory.CreateDirectory(profile);
+    }
+    return profile;
+  }
+  static void CopyDirectory(string source,string target){
+    Directory.CreateDirectory(target);
+    foreach(string file in Directory.GetFiles(source))File.Copy(file,Path.Combine(target,Path.GetFileName(file)),true);
+    foreach(string dir in Directory.GetDirectories(source))CopyDirectory(dir,Path.Combine(target,Path.GetFileName(dir)));
   }
   static void SetTopmost(string request){
     bool enabled=request.Contains("enabled=1"),desktop=request.Contains("mode=desktop");

@@ -1,8 +1,0 @@
-{
-  "name": "focus-desk",
-  "version": "1.0.0",
-  "private": true,
-  "description": "A lightweight local-first planning and task management web app.",
-  "scripts": {},
-  "devDependencies": {}
-}
