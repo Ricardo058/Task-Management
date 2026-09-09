@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -41,10 +43,11 @@ static class RixuLauncher {
 
       bool pocket=request.Contains("pocket"),desktop=request.Contains("desktop"),manage=!pocket&&!desktop;
       string edge=FindEdge();if(edge==null)throw new Exception("Microsoft Edge was not found.");
+      var stateServer=new StateServer(root);stateServer.Start();
       string modeQuery=manage?"?manage=1":pocket?"?widget=1&pocket=1":"?widget=1&desktop=1&topmost=1";
       string title=manage?"Rixu Manager":pocket?"Rixu Pocket":"Rixu Desktop Widget";
       string build=GetBuildVersion(root),windowTitle=title+" · "+build;
-      string page=new Uri(Path.Combine(root,"web","index.html")).AbsoluteUri+modeQuery+"&build="+build;
+      string page=new Uri(Path.Combine(root,"web","index.html")).AbsoluteUri+modeQuery+"&build="+build+"&apiPort="+stateServer.Port;
       string profile=PrepareProfile(root);
       IntPtr window=FindTitledWindow(windowTitle);
       if(window==Zero){
@@ -96,6 +99,38 @@ static class RixuLauncher {
     string local=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),programs=Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),programsX86=Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
     foreach(string path in new[]{Path.Combine(programsX86,"Tencent","WeChat","WeChat.exe"),Path.Combine(programs,"Tencent","Weixin","Weixin.exe"),Path.Combine(local,"Tencent","WeChat","WeChat.exe")})if(File.Exists(path)){Process.Start(new ProcessStartInfo(path){UseShellExecute=true});return;}
     throw new Exception("未找到微信。图片已保存在下载文件夹，可在微信中手动选择发送。");
+  }
+  static void WriteAtomic(string path,string content){
+    string temp=path+".tmp";File.WriteAllText(temp,content,new UTF8Encoding(false));
+    try{if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);}catch{File.Copy(temp,path,true);File.Delete(temp);}
+  }
+  static void SaveProjectState(string root,string json){
+    if(!json.TrimStart().StartsWith("{")||!json.TrimEnd().EndsWith("}"))throw new Exception("The state payload is invalid.");
+    string directory=Path.Combine(root,"data");Directory.CreateDirectory(directory);WriteAtomic(Path.Combine(directory,"rixu-data.json"),json);WriteAtomic(Path.Combine(directory,"rixu-data.js"),"window.__RIXU_PROJECT_DATA__="+json+";");
+  }
+  sealed class StateServer {
+    readonly string root;TcpListener listener;public int Port{get;private set;}
+    public StateServer(string rootPath){root=rootPath;}
+    public void Start(){listener=new TcpListener(IPAddress.Loopback,0);listener.Start();Port=((IPEndPoint)listener.LocalEndpoint).Port;var thread=new Thread(Listen){IsBackground=true,Name="RixuStateServer"};thread.Start();}
+    void Listen(){while(true){try{var client=listener.AcceptTcpClient();ThreadPool.QueueUserWorkItem(Handle,client);}catch{return;}}}
+    void Handle(object state){
+      using(var client=(TcpClient)state)try{
+        var stream=client.GetStream();stream.ReadTimeout=5000;byte[] chunk=new byte[4096];using(var request=new MemoryStream()){
+          int headerEnd=-1,read;byte[] all=null;
+          while(headerEnd<0&&request.Length<65536&&(read=stream.Read(chunk,0,chunk.Length))>0){request.Write(chunk,0,read);all=request.ToArray();headerEnd=FindHeaderEnd(all,all.Length);}
+          if(headerEnd<0)throw new Exception("Invalid request headers.");
+          string header=Encoding.ASCII.GetString(all,0,headerEnd),first=header.Split(new[]{"\r\n"},StringSplitOptions.None)[0];
+          if(first.StartsWith("OPTIONS ",StringComparison.OrdinalIgnoreCase)){Respond(stream,"204 No Content");return;}
+          if(!first.StartsWith("POST /state ",StringComparison.OrdinalIgnoreCase)){Respond(stream,"404 Not Found");return;}
+          int length=ContentLength(header);if(length<2||length>4*1024*1024)throw new Exception("Invalid content length.");int bodyStart=headerEnd+4;
+          while(request.Length<bodyStart+length&&(read=stream.Read(chunk,0,Math.Min(chunk.Length,(int)(bodyStart+length-request.Length))))>0)request.Write(chunk,0,read);
+          all=request.ToArray();if(all.Length<bodyStart+length)throw new Exception("Incomplete request body.");SaveProjectState(root,Encoding.UTF8.GetString(all,bodyStart,length));Respond(stream,"204 No Content");
+        }
+      }catch{try{Respond(client.GetStream(),"400 Bad Request");}catch{}}
+    }
+    static int FindHeaderEnd(byte[] bytes,int length){for(int i=3;i<length;i++)if(bytes[i-3]==13&&bytes[i-2]==10&&bytes[i-1]==13&&bytes[i]==10)return i-3;return-1;}
+    static int ContentLength(string header){foreach(string line in header.Split(new[]{"\r\n"},StringSplitOptions.None))if(line.StartsWith("Content-Length:",StringComparison.OrdinalIgnoreCase)){int value;if(Int32.TryParse(line.Substring(15).Trim(),out value))return value;}return 0;}
+    static void Respond(NetworkStream stream,string status){byte[] response=Encoding.ASCII.GetBytes("HTTP/1.1 "+status+"\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");stream.Write(response,0,response.Length);}
   }
   static void SaveReport(string[] args,string root){
     string raw=Array.Find(args,x=>x.StartsWith("rixu://report",StringComparison.OrdinalIgnoreCase));

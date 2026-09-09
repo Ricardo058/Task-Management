@@ -18,13 +18,18 @@ function strategyItem(){const x=item('长期战略','记录未来 3—5 年真�
 function resetDailyState(store,targetDate=today){
   if(store.lastStatusDate===targetDate)return false;
   const previousDate=store.lastStatusDate;
-  for(const type of TASK_TYPES)for(const task of store.items?.[type]||[]){task.statusHistory=task.statusHistory&&typeof task.statusHistory==='object'?task.statusHistory:{};if(previousDate)task.statusHistory[previousDate]=task.status||'todo';task.status='todo'}
+  for(const task of store.items?.today||[]){task.statusHistory=task.statusHistory&&typeof task.statusHistory==='object'?task.statusHistory:{};if(previousDate)task.statusHistory[previousDate]=task.status||'todo';task.status='todo'}
   store.lastStatusDate=targetDate;return true;
 }
 function setTaskStatus(task,status){task.status=status;task.statusHistory=task.statusHistory&&typeof task.statusHistory==='object'?task.statusHistory:{};task.statusHistory[today]=status}
+function restorePersistentStatuses(store){
+  if(store.statusResetScope==='today-only-v1')return;
+  for(const type of ['year','quarter','month','week'])for(const task of store.items?.[type]||[]){const history=task.statusHistory||{},latest=Object.keys(history).sort().at(-1);if(latest&&task.status==='todo')task.status=history[latest]||'todo'}
+  store.statusResetScope='today-only-v1';
+}
 
 function load(){
-  try{const saved=JSON.parse(localStorage.getItem(DB_KEY));if(saved){saved.items=saved.items||{};for(const type of TASK_TYPES)saved.items[type]=(saved.items[type]||[]).map(x=>normalizeTask(x,type));if(!saved.items.year.some(x=>x.systemCard==='long-strategy'||x.id==='rixu-long-term-strategy'))saved.items.year.unshift(strategyItem());saved.habits=(saved.habits||[]).map(h=>({...h,enabled:h.enabled!==false,startDate:h.startDate||today,history:Array.isArray(h.history)?h.history:[]}));saved.config=saved.config||[];saved.windowPinned=saved.windowPinned===true;resetDailyState(saved);localStorage.setItem(DB_KEY,JSON.stringify(saved));return saved}}catch{}
+  try{const local=JSON.parse(localStorage.getItem(DB_KEY)),project=new URLSearchParams(location.search).has('testData')?null:window.__RIXU_PROJECT_DATA__,saved=project&&(!local||(project.savedAt||0)>(local.savedAt||0))?JSON.parse(JSON.stringify(project)):local;if(saved){saved.items=saved.items||{};for(const type of TASK_TYPES)saved.items[type]=(saved.items[type]||[]).map(x=>normalizeTask(x,type));if(!saved.items.year.some(x=>x.systemCard==='long-strategy'||x.id==='rixu-long-term-strategy'))saved.items.year.unshift(strategyItem());saved.habits=(saved.habits||[]).map(h=>({...h,enabled:h.enabled!==false,startDate:h.startDate||today,history:Array.isArray(h.history)?h.history:[]}));saved.config=saved.config||[];saved.windowPinned=saved.windowPinned===true;restorePersistentStatuses(saved);resetDailyState(saved);localStorage.setItem(DB_KEY,JSON.stringify(saved));return saved}}catch{}
   let old=[];try{old=JSON.parse(localStorage.getItem(OLD_KEY))||[]}catch{}
   const initial={items:{
     year:[strategyItem(),item('建立更从容、有成长感的生活系统','让工作、身体和关系都获得稳定投入。','year','doing','2026-12-31')],
@@ -32,13 +37,16 @@ function load(){
     month:[item('稳定每周复盘节奏','连续完成四次周复盘。','month','doing',monthEnd())],
     week:[item('完成任务工具桌面版','让它值得每天打开。','week','doing',weekEnd()),item('安排两次有氧运动','每次至少 30 分钟。','week','todo',weekEnd()),item('整理本周关键资料','','week','todo',weekEnd())],
     today:old.length?old.map(x=>normalizeTask({...x,pinned:false},'today')):[item('完成今天最重要的工作','','today','doing',today),item('阅读 20 分钟','','today','todo',today),item('整理桌面与收件箱','','today','done',today)]
-  },habits:[{id:uid(),title:'运动 30 分钟',emoji:'🏃',enabled:true,startDate:today,history:[]},{id:uid(),title:'喝足 8 杯水',emoji:'💧',enabled:true,startDate:today,history:[today]},{id:uid(),title:'睡前阅读',emoji:'📖',enabled:true,startDate:today,history:[]}],config:[{id:'week',visible:true,collapsed:false},{id:'today',visible:true,collapsed:false},{id:'habits',visible:true,collapsed:false},{id:'month',visible:false,collapsed:false},{id:'quarter',visible:false,collapsed:true},{id:'year',visible:false,collapsed:true}],windowPinned:false,lastStatusDate:today};localStorage.setItem(DB_KEY,JSON.stringify(initial));return initial;
+  },habits:[{id:uid(),title:'运动 30 分钟',emoji:'🏃',enabled:true,startDate:today,history:[]},{id:uid(),title:'喝足 8 杯水',emoji:'💧',enabled:true,startDate:today,history:[today]},{id:uid(),title:'睡前阅读',emoji:'📖',enabled:true,startDate:today,history:[]}],config:[{id:'week',visible:true,collapsed:false},{id:'today',visible:true,collapsed:false},{id:'habits',visible:true,collapsed:false},{id:'month',visible:false,collapsed:false},{id:'quarter',visible:false,collapsed:true},{id:'year',visible:false,collapsed:true}],windowPinned:false,lastStatusDate:today,statusResetScope:'today-only-v1'};localStorage.setItem(DB_KEY,JSON.stringify(initial));return initial;
 }
 function item(title,note,type,status,date){return{id:uid(),title,note,type,status,statusHistory:{[today]:status},date,startAt:defaultStartAt(date),endAt:defaultEndAt(date),pinned:false,createdAt:Date.now()}}
 function monthEnd(){const d=new Date();return dateKey(new Date(d.getFullYear(),d.getMonth()+1,0))}
 function weekEnd(){const d=new Date();d.setDate(d.getDate()+((7-d.getDay())%7));return dateKey(d)}
-let data=load(),page='overview',search='',deferredInstall=null,editorSaveTimer=null,editorDirty=false;
-function save(){localStorage.setItem(DB_KEY,JSON.stringify(data));renderAll()}
+let data=load(),page='overview',search='',deferredInstall=null,editorSaveTimer=null,editorDirty=false,projectSaveTimer=null;
+const apiPort=new URLSearchParams(location.search).get('apiPort');
+function queueProjectSave(){if(!apiPort||new URLSearchParams(location.search).has('preview'))return;clearTimeout(projectSaveTimer);projectSaveTimer=setTimeout(()=>fetch(`http://127.0.0.1:${apiPort}/state`,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(data)}).catch(()=>{}),500)}
+function persistData(){data.savedAt=Date.now();localStorage.setItem(DB_KEY,JSON.stringify(data));queueProjectSave()}
+function save(){persistData();renderAll()}
 function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function fmtDate(v){if(!v)return '未设日期';const raw=String(v),date=raw.slice(0,10),time=raw.includes('T')?raw.slice(11,16):'';if(date===today)return `今天${time?` ${time}`:''}`;const d=new Date(`${date}T00:00:00`);return `${d.getMonth()+1}月${d.getDate()}日${time?` ${time}`:''}`}
 function progressOf(list){if(!list.length)return 0;return Math.round(list.filter(x=>x.status==='done').length/list.length*100)}
@@ -56,7 +64,7 @@ function renderWidget(){
   const pinned=allItems().filter(x=>x.pinned);$('#widgetSections').innerHTML=(pinned.length?pinnedWidgetSection(pinned):'')+data.config.filter(x=>x.visible).map((cfg,index)=>widgetSection(cfg,index+(pinned.length?1:0))).join('');
   updateWindowPinButton();
   bindActions($('#widgetSections'));
-  $$('.widget-section-head[data-section]').forEach(btn=>btn.onclick=()=>{const cfg=data.config.find(x=>x.id===btn.dataset.section);cfg.collapsed=!cfg.collapsed;localStorage.setItem(DB_KEY,JSON.stringify(data));renderWidget()});
+  $$('.widget-section-head[data-section]').forEach(btn=>btn.onclick=()=>{const cfg=data.config.find(x=>x.id===btn.dataset.section);cfg.collapsed=!cfg.collapsed;persistData();renderWidget()});
 }
 function pinnedWidgetSection(list){const content=list.map(x=>`<div class="mini-item pinned" data-id="${x.id}" data-type="${x.type}"><button data-toggle-item>✓</button><strong><i class="mini-pin">${pinIcon()}</i>${esc(x.title)}</strong><span>${labels[x.type]} · ${fmtDate(x.startAt)}</span></div>`).join('');return `<section class="widget-section pinned-widget-section"><div class="widget-section-head"><i class="widget-pin-mark">${pinIcon()}</i><strong>常驻任务</strong><small>${list.length} 项固定展示</small></div><div class="widget-section-body">${content}</div></section>`}
 function widgetSection(cfg,index){
@@ -163,7 +171,7 @@ function bindActions(root){
 function go(next){page=next;renderManager()}
 function setAutoSaveState(text,state=''){$('#autoSaveState').textContent=text;$('#autoSaveState').className=`auto-save-state ${state}`.trim()}
 function updateWindowPinButton(){const b=$('#widgetTopmost');if(!b)return;b.classList.toggle('active',data.windowPinned);b.innerHTML=pinIcon();b.title=data.windowPinned?'取消窗口置顶':'置顶窗口';b.setAttribute('aria-pressed',String(data.windowPinned))}
-function toggleWindowTopmost(){data.windowPinned=!data.windowPinned;localStorage.setItem(DB_KEY,JSON.stringify(data));updateWindowPinButton();const params=new URLSearchParams(location.search),mode=params.has('desktop')?'desktop':'pocket';location.href=`rixu://topmost?mode=${mode}&enabled=${data.windowPinned?1:0}`;toast(data.windowPinned?'窗口已置顶':'已取消窗口置顶')}
+function toggleWindowTopmost(){data.windowPinned=!data.windowPinned;persistData();updateWindowPinButton();const params=new URLSearchParams(location.search),mode=params.has('desktop')?'desktop':'pocket';location.href=`rixu://topmost?mode=${mode}&enabled=${data.windowPinned?1:0}`;toast(data.windowPinned?'窗口已置顶':'已取消窗口置顶')}
 function persistEditor(){
   const type=$('#editorType').value;let id=$('#editorId').value;const title=$('#editorTitle').value.trim();if(!type)return false;if(!title){setAutoSaveState('填写标题后自动保存','saving');return false}
   if(type==='habits'){
@@ -173,18 +181,18 @@ function persistEditor(){
     const startAt=$('#editorDate').value||defaultStartAt(),endAt=$('#editorEndDate').value||defaultEndAt(startAt.slice(0,10)),status=$('#editorStatus').value,values={title,note:$('#editorNote').value.trim(),date:startAt.slice(0,10),startAt,endAt,type,pinned:$('#editorPinned').checked,updatedAt:Date.now()};
     if(id){const current=data.items[type]?.find(x=>x.id===id);if(current){const wasPinned=current.pinned;Object.assign(current,values);setTaskStatus(current,status);if(!wasPinned&&current.pinned)moveToFront(data.items[type],id)}}else{id=uid();const created={...values,id,createdAt:Date.now()};setTaskStatus(created,status);data.items[type].unshift(created)}
   }
-  $('#editorId').value=id;$('#deleteItem').classList.remove('hidden');$('#editorHeading').textContent='调整这项内容';localStorage.setItem(DB_KEY,JSON.stringify(data));editorDirty=false;setAutoSaveState('已自动保存','saved');return true;
+  $('#editorId').value=id;$('#deleteItem').classList.remove('hidden');$('#editorHeading').textContent='调整这项内容';persistData();editorDirty=false;setAutoSaveState('已自动保存','saved');return true;
 }
 function scheduleEditorSave(){editorDirty=true;clearTimeout(editorSaveTimer);setAutoSaveState('正在保存…','saving');editorSaveTimer=setTimeout(persistEditor,520)}
 function openEditor(type,id=''){clearTimeout(editorSaveTimer);editorDirty=false;const isHabit=type==='habits',x=isHabit?data.habits.find(h=>h.id===id):data.items[type]?.find(i=>i.id===id),systemCard=x?.systemCard==='long-strategy';$('#editorForm').reset();$('#editorType').value=type;$('#editorId').value=id;$('#editorTitle').value=x?.title||'';$('#editorNote').value=x?.note||'';$('#editorDate').type=isHabit?'date':'datetime-local';$('#editorDate').value=isHabit?(x?.startDate||today):(x?.startAt||defaultStartAt());$('#editorEndDate').value=x?.endAt||defaultEndAt();$('#editorStatus').innerHTML=isHabit?'<option value="active">加入打卡</option><option value="hidden">隐藏</option>':'<option value="todo">待开始</option><option value="doing">进行中</option><option value="done">已完成</option>';$('#editorStatus').value=isHabit?(x?.enabled===false?'hidden':'active'):(x?.status||'todo');$('#editorPinned').checked=!isHabit&&x?.pinned===true;$('#editorPinField').classList.toggle('hidden',isHabit);$('#editorNoteField').classList.toggle('hidden',isHabit);$('#editorEndField').classList.toggle('hidden',isHabit);$('#editorDateLabel').textContent=isHabit?'开始日期':'执行时间';$('#editorHeading').textContent=id?'调整这项内容':`添加${labels[type]||'内容'}`;$('#editorEyebrow').textContent=isHabit?'日常节奏':periodLabel(type)||'NEW ITEM';$('#deleteItem').classList.toggle('hidden',!id||systemCard);setAutoSaveState(systemCard?'固定卡片会自动保存':id?'修改后自动保存':'填写标题后自动保存');$('#editorModal').classList.remove('hidden');setTimeout(()=>$('#editorTitle').focus(),40)}
 function closeEditor(flush=true,rerender=true){clearTimeout(editorSaveTimer);if(flush&&editorDirty)persistEditor();editorDirty=false;$('#editorModal').classList.add('hidden');if(rerender)renderAll()}
 function renderAll(){renderWidget();renderManager()}
-function ensureCurrentDay(){const current=dateKey();if(current===today)return;today=current;resetDailyState(data,current);localStorage.setItem(DB_KEY,JSON.stringify(data));renderAll();toast('新的一天，任务和打卡状态已重置')}
+function ensureCurrentDay(){const current=dateKey();if(current===today)return;today=current;resetDailyState(data,current);persistData();renderAll();toast('新的一天，每日任务和打卡状态已重置')}
 function burst(el){el.animate([{transform:'scale(.75)'},{transform:'scale(1.18)'},{transform:'scale(1)'}],{duration:330,easing:'ease-out'})}
 let toastTimer;function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),2200)}
 
 function setup(){
-  const params=new URLSearchParams(location.search),widget=params.has('widget')&&!params.has('manage'),pocket=params.has('pocket'),build=params.get('build');if(pageTitles[params.get('page')])page=params.get('page');if(widget&&params.get('topmost')==='1'){data.windowPinned=true;localStorage.setItem(DB_KEY,JSON.stringify(data))}document.title=(widget?(pocket?'Rixu Pocket':'Rixu Desktop Widget'):'Rixu Manager')+(build?` · ${build}`:'');document.body.classList.toggle('widget-mode',widget);
+  const params=new URLSearchParams(location.search),widget=params.has('widget')&&!params.has('manage'),pocket=params.has('pocket'),build=params.get('build');if(pageTitles[params.get('page')])page=params.get('page');if(widget&&params.get('topmost')==='1'){data.windowPinned=true;persistData()}document.title=(widget?(pocket?'Rixu Pocket':'Rixu Desktop Widget'):'Rixu Manager')+(build?` · ${build}`:'');document.body.classList.toggle('widget-mode',widget);
   $('#globalSearch').oninput=e=>{search=e.target.value;renderManager()};$('#globalAdd').onclick=()=>openEditor(page==='overview'?'today':page==='widget'?'week':page);
   $('#backButton').onclick=()=>go('overview');
   $('#pocketEntry').onclick=()=>{location.href='rixu://pocket'};
@@ -202,6 +210,6 @@ function setup(){
   window.addEventListener('beforeunload',()=>{if(editorDirty)persistEditor()});
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e});
   if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
-  renderAll();if(widget&&data.windowPinned&&params.get('topmost')!=='1'&&!params.has('preview'))setTimeout(()=>{const mode=params.has('desktop')?'desktop':'pocket';location.href=`rixu://topmost?mode=${mode}&enabled=1`},900);if(!widget&&!params.has('preview')&&!localStorage.getItem(`rixu-report-${today}`))setTimeout(()=>requestReport(true),1800);setTimeout(()=>$('#splash').classList.add('hide'),650);setTimeout(()=>$('#splash').remove(),1250);
+  renderAll();setTimeout(persistData,1000);if(widget&&data.windowPinned&&params.get('topmost')!=='1'&&!params.has('preview'))setTimeout(()=>{const mode=params.has('desktop')?'desktop':'pocket';location.href=`rixu://topmost?mode=${mode}&enabled=1`},900);if(!widget&&!params.has('preview')&&!localStorage.getItem(`rixu-report-${today}`))setTimeout(()=>requestReport(true),1800);setTimeout(()=>$('#splash').classList.add('hide'),650);setTimeout(()=>$('#splash').remove(),1250);
 }
 setup();
